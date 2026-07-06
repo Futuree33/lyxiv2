@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1783244315277,
+      "tag": "0000_blushing_bruce_banner",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1783248570728,
+      "tag": "0001_freezing_starbolt",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1783249611481,
+      "tag": "0002_normal_metal_master",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1783250415366,
+      "tag": "0003_pale_lifeguard",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1783305872339,
+      "tag": "0004_sweet_triathlon",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1783310668834,
+      "tag": "0005_tranquil_lady_ursula",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1783315273627,
+      "tag": "0006_clammy_stardust",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1783315770784,
+      "tag": "0007_funny_earthquake",
+      "breakpoints": true
+    }
+  ]
+}

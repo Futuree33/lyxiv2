@@ -1,0 +1,1 @@
+ALTER TABLE `characters` ADD `exp` int DEFAULT 0 NOT NULL;

@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mysql:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(\"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe\" -u root -proot -e \"CREATE DATABASE IF NOT EXISTS lyxinew; SHOW DATABASES LIKE ''lyxinew'';\")",
+      "Bash(\"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe\" -u root -e \"CREATE DATABASE IF NOT EXISTS lyxinew; SHOW DATABASES LIKE ''lyxinew'';\")",
+      "Bash(npm run start:dev:*)",
+      "Bash(curl:*)",
+      "Bash(npm run db:migrate:*)",
+      "Bash(npx drizzle-kit push:*)",
+      "Bash(ls:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run db:push:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}
