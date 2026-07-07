@@ -92,6 +92,13 @@ export class AuthService {
         email: users.email,
         username: users.username,
         isAdmin: users.isAdmin,
+        isPrivate: users.isPrivate,
+        // Dual level fields
+        lyxiLevel: users.lyxiLevel,
+        lyxiXp: users.lyxiXp,
+        creatorLevel: users.creatorLevel,
+        creatorXp: users.creatorXp,
+        // Legacy fields
         level: users.level,
         xp: users.xp,
         messagesCount: users.messagesCount,
@@ -123,23 +130,80 @@ export class AuthService {
       .from(chatLogs)
       .where(and(eq(chatLogs.user, userId), eq(chatLogs.role, 'user')));
 
-    // Calculate level and XP to next level
-    const level = Math.floor(user.xp / 100) + 1;
-    const xpToNextLevel = (level * 100) - user.xp;
+    // Calculate Lyxi level and XP to next level
+    const lyxiLevel = Math.floor(user.lyxiXp / 100) + 1;
+    const lyxiXpToNextLevel = (lyxiLevel * 100) - user.lyxiXp;
+
+    // Calculate Creator level and XP to next level
+    const creatorLevel = Math.floor(user.creatorXp / 200) + 1;
+    const creatorXpToNextLevel = (creatorLevel * 200) - user.creatorXp;
 
     return {
       id: user.id,
       email: user.email,
       username: user.username,
       isAdmin: user.isAdmin,
+      isPrivate: user.isPrivate,
       createdAt: user.createdAt,
       stats: {
-        level,
-        xp: user.xp,
-        xpToNextLevel,
+        // Dual level system
+        lyxiLevel,
+        lyxiXp: user.lyxiXp,
+        lyxiXpToNextLevel,
+        creatorLevel,
+        creatorXp: user.creatorXp,
+        creatorXpToNextLevel,
+        // Legacy fields for backward compatibility
+        level: lyxiLevel,
+        xp: user.lyxiXp,
+        xpToNextLevel: lyxiXpToNextLevel,
+        // Stats
         charactersCreated: characterCount.count,
         messagesSent: messageCount.count,
       },
     };
+  }
+
+  async updateProfile(userId: number, data: { username?: string; email?: string }) {
+    await this.db
+      .update(users)
+      .set({
+        ...(data.username && { username: data.username }),
+        ...(data.email && { email: data.email }),
+      })
+      .where(eq(users.id, userId));
+
+    return { success: true };
+  }
+
+  async changePassword(userId: number, currentPassword: string, newPassword: string) {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!compareSync(currentPassword, user.password)) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    await this.db
+      .update(users)
+      .set({ password: hashSync(newPassword, 12) })
+      .where(eq(users.id, userId));
+
+    return { success: true };
+  }
+
+  async updatePrivacy(userId: number, isPrivate: boolean) {
+    await this.db
+      .update(users)
+      .set({ isPrivate })
+      .where(eq(users.id, userId));
+
+    return { success: true, isPrivate };
   }
 }

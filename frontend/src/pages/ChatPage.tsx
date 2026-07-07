@@ -9,9 +9,16 @@ import {
   NotebookPen,
   Clapperboard,
   SendHorizontal,
+  Trash2,
 } from 'lucide-react';
-import { api, ApiError, type Character } from '../lib/api';
+import { api, ApiError, type Character, getImageUrl } from '../lib/api';
 import { Avatar } from '../components/Avatar';
+import { ChatSettingsModal } from '../components/ChatSettingsModal';
+import { ImagePromptModal } from '../components/ImagePromptModal';
+import { GeneratingImageModal } from '../components/GeneratingImageModal';
+import { ImageViewerModal } from '../components/ImageViewerModal';
+import { AtmospherePanel } from '../components/AtmospherePanel';
+import { NarratorMessage } from '../components/NarratorMessage';
 
 const toolbarActions = [
   { label: 'NSFW', icon: EyeOff, className: 'border border-hairline bg-surface text-muted' },
@@ -23,14 +30,16 @@ const toolbarActions = [
 
 interface DisplayMessage {
   id: string | number;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'narrator';
   content: string;
   pending?: boolean;
   failed?: boolean;
   idempotencyKey?: string;
+  narratorType?: 'time_skip' | 'scene_transition' | 'mood_shift' | 'narrative_beat';
 }
 
 interface ChatImageData {
+  id: number;
   url: string;
   description: string;
   messageId: string | number;
@@ -57,21 +66,121 @@ export function ChatPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [characterExp, setCharacterExp] = useState(0);
   const [expAnimation, setExpAnimation] = useState<ExpAnimation | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showImagePrompt, setShowImagePrompt] = useState(false);
+  const [loadingGreeting, setLoadingGreeting] = useState(false);
+  const [generatingManualImage, setGeneratingManualImage] = useState(false);
+  const [viewingImage, setViewingImage] = useState<ChatImageData | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const hasRequestedGreeting = useRef(false);
+
+  // Calculate visual intensity (0-100) from intimacy level and narrative tension
+  const visualIntensity = character ? (() => {
+    const intimacyLevel = character.intimacyLevel || 0;
+    let narrativeTension = 5; // default
+    if (character.narrativeArc) {
+      try {
+        const arc = JSON.parse(character.narrativeArc);
+        narrativeTension = arc.tension || 5;
+      } catch (e) {
+        // ignore parse error
+      }
+    }
+    return Math.min(100, (intimacyLevel * 5) + (narrativeTension * 3));
+  })() : 0;
+
+  const intensityClass = visualIntensity > 70
+    ? 'intensity-high'
+    : visualIntensity > 40
+    ? 'intensity-medium'
+    : 'intensity-low';
 
   useEffect(() => {
     setCharacter(null);
     setMessages([]);
+    setImages([]);
     setLoadError(null);
     setCharacterExp(0);
-    Promise.all([api.getCharacter(id), api.getHistory(id)])
-      .then(([char, history]) => {
+    hasRequestedGreeting.current = false;
+    Promise.all([api.getCharacter(id), api.getHistory(id), api.getNarratorMessages(id), api.getCharacterImages(id)])
+      .then(([char, history, narratorMsgs, historicalImages]) => {
         setCharacter(char);
         setCharacterExp(char.exp || 0);
-        setMessages(history);
+
+        // Merge narrator messages into the timeline
+        const mergedMessages: DisplayMessage[] = [];
+        const narratorByPosition = new Map<number | null, typeof narratorMsgs>();
+
+        // Group narrator messages by insertedAfterMessageId
+        for (const nm of narratorMsgs) {
+          const key = nm.insertedAfterMessageId;
+          if (!narratorByPosition.has(key)) {
+            narratorByPosition.set(key, []);
+          }
+          narratorByPosition.get(key)!.push(nm);
+        }
+
+        // Insert narrator messages at the beginning if they have no insertedAfterMessageId
+        const initialNarrators = narratorByPosition.get(null) || [];
+        for (const nm of initialNarrators) {
+          mergedMessages.push({
+            id: `narrator-${nm.id}`,
+            role: 'narrator',
+            content: nm.content,
+            narratorType: nm.type,
+          });
+        }
+
+        // Merge history with narrator messages
+        for (const msg of history) {
+          mergedMessages.push(msg);
+
+          // Insert narrator messages that come after this message
+          const narratorsAfter = narratorByPosition.get(msg.id) || [];
+          for (const nm of narratorsAfter) {
+            mergedMessages.push({
+              id: `narrator-${nm.id}`,
+              role: 'narrator',
+              content: nm.content,
+              narratorType: nm.type,
+            });
+          }
+        }
+
+        setMessages(mergedMessages);
+
+        // Load historical images and map them to their messages
+        const imageData: ChatImageData[] = historicalImages.map((img) => ({
+          id: img.id,
+          url: img.imageUrl,
+          description: img.sceneDescription,
+          messageId: img.chatLogId,
+        }));
+        setImages(imageData);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Failed to load chat'));
   }, [id]);
+
+  // Auto-request greeting if chat is empty
+  useEffect(() => {
+    if (character && messages.length === 0 && !loadingGreeting && !hasRequestedGreeting.current && !sending) {
+      hasRequestedGreeting.current = true;
+      setLoadingGreeting(true);
+      setSending(true); // Show typing indicator
+      api.getGreeting(id)
+        .then((response) => {
+          setMessages([{ id: 'greeting', role: 'assistant', content: response.message }]);
+        })
+        .catch((err) => {
+          console.error('Failed to get greeting:', err);
+          hasRequestedGreeting.current = false;
+        })
+        .finally(() => {
+          setLoadingGreeting(false);
+          setSending(false);
+        });
+    }
+  }, [character, messages.length, id, loadingGreeting, sending]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -86,39 +195,124 @@ export function ChatPage() {
   async function send(text: string, idempotencyKey: string, optimisticId: string) {
     setSending(true);
     setError(null);
-    setLoadingImage(true);
+    setLoadingImage(false);
+
+    const replyId = `${optimisticId}-reply`;
+    let firstToken = true;
+
+    // Mark user message as sent
+    setMessages((prev) =>
+      prev.map((m) => (m.id === optimisticId ? { ...m, pending: false, failed: false } : m))
+    );
+
     try {
-      const response = await api.sendMessage(id, text, idempotencyKey);
-      const replyId = `${optimisticId}-reply`;
+      await api.sendMessageStream(id, text, idempotencyKey, {
+        onToken: (token) => {
+          if (firstToken) {
+            // On first token, hide typing indicator and add assistant message
+            setSending(false);
+            firstToken = false;
+            setMessages((prev) => [
+              ...prev,
+              { id: replyId, role: 'assistant' as const, content: token },
+            ]);
+          } else {
+            // Append subsequent tokens
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === replyId ? { ...m, content: m.content + token } : m
+              )
+            );
+          }
+        },
+        onGeneratingImage: () => {
+          setLoadingImage(true);
+        },
+        onImage: async (image) => {
+          await reloadImages();
+          setLoadingImage(false);
+        },
+        onExp: (amount) => {
+          const oldExp = characterExp;
+          const newExp = oldExp + amount;
+          setExpAnimation({ from: oldExp, to: newExp, timestamp: Date.now() });
+          setCharacterExp(newExp);
+        },
+        onDone: async () => {
+          setSending(false);
+          setLoadingImage(false);
+          // Refresh character data to get updated atmospheric context
+          try {
+            const updatedCharacter = await api.getCharacter(id);
+            setCharacter(updatedCharacter);
 
-      setMessages((prev) => [
-        ...prev.map((m) => (m.id === optimisticId ? { ...m, pending: false, failed: false } : m)),
-        { id: replyId, role: 'assistant' as const, content: response.message },
-      ]);
+            // Refresh narrator messages to show any new narrator messages
+            const narratorMsgs = await api.getNarratorMessages(id);
 
-      // Handle image if present
-      if (response.image) {
-        setImages((prev) => [
-          ...prev,
-          {
-            url: response.image!.url,
-            description: response.image!.description,
-            messageId: replyId,
-          },
-        ]);
-      }
+            // Re-merge narrator messages with current messages
+            setMessages((currentMessages) => {
+              // Filter out old narrator messages and regular messages only
+              const regularMessages = currentMessages.filter(m => m.role !== 'narrator');
+              const mergedMessages: DisplayMessage[] = [];
+              const narratorByPosition = new Map<number | null, typeof narratorMsgs>();
 
-      // Handle EXP gain if present
-      if (response.expGained !== undefined) {
-        const oldExp = characterExp;
-        const newExp = oldExp + response.expGained;
-        setExpAnimation({ from: oldExp, to: newExp, timestamp: Date.now() });
-        setCharacterExp(newExp);
-      }
+              // Group narrator messages by insertedAfterMessageId
+              for (const nm of narratorMsgs) {
+                const key = nm.insertedAfterMessageId;
+                if (!narratorByPosition.has(key)) {
+                  narratorByPosition.set(key, []);
+                }
+                narratorByPosition.get(key)!.push(nm);
+              }
+
+              // Insert narrator messages at the beginning if they have no insertedAfterMessageId
+              const initialNarrators = narratorByPosition.get(null) || [];
+              for (const nm of initialNarrators) {
+                mergedMessages.push({
+                  id: `narrator-${nm.id}`,
+                  role: 'narrator',
+                  content: nm.content,
+                  narratorType: nm.type,
+                });
+              }
+
+              // Merge with narrator messages
+              for (const msg of regularMessages) {
+                mergedMessages.push(msg);
+
+                // Insert narrator messages that come after this message
+                const msgId = typeof msg.id === 'string' ? parseInt(msg.id) : msg.id;
+                const narratorsAfter = narratorByPosition.get(msgId) || [];
+                for (const nm of narratorsAfter) {
+                  mergedMessages.push({
+                    id: `narrator-${nm.id}`,
+                    role: 'narrator',
+                    content: nm.content,
+                    narratorType: nm.type,
+                  });
+                }
+              }
+
+              return mergedMessages;
+            });
+          } catch (err) {
+            console.error('Failed to refresh character data:', err);
+          }
+        },
+        onError: (error) => {
+          setError(error);
+          setMessages((prev) =>
+            prev.map((m) => (m.id === optimisticId ? { ...m, pending: false, failed: true } : m))
+          );
+          setSending(false);
+          setLoadingImage(false);
+        },
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to send message');
-      setMessages((prev) => prev.map((m) => (m.id === optimisticId ? { ...m, pending: false, failed: true } : m)));
-    } finally {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === optimisticId ? { ...m, pending: false, failed: true } : m))
+      );
       setSending(false);
       setLoadingImage(false);
     }
@@ -152,6 +346,57 @@ export function ChatPage() {
     send(m.content, m.idempotencyKey, m.id as string);
   }
 
+  async function reloadImages() {
+    try {
+      const historicalImages = await api.getCharacterImages(id);
+      const imageData: ChatImageData[] = historicalImages.map((img) => ({
+        id: img.id,
+        url: img.imageUrl,
+        description: img.sceneDescription,
+        messageId: img.chatLogId,
+      }));
+      setImages(imageData);
+    } catch (err) {
+      console.error('Failed to reload images:', err);
+    }
+  }
+
+  async function handleGenerateImage(customPrompt: string) {
+    if (generatingManualImage || !character) return;
+
+    setGeneratingManualImage(true);
+    setLoadingImage(true);
+    try {
+      await api.generateStandaloneImage(id, customPrompt);
+      setShowImagePrompt(false);
+      // Reload all images to get the new one with its ID
+      await reloadImages();
+    } catch (err) {
+      console.error('Failed to generate image:', err);
+      setError(err instanceof ApiError ? err.message : 'Failed to generate image');
+    } finally {
+      setGeneratingManualImage(false);
+      setLoadingImage(false);
+    }
+  }
+
+  async function handleDeleteImage(imageId: number) {
+    if (!confirm('Delete this image? This cannot be undone.')) return;
+
+    try {
+      await api.deleteImage(imageId);
+      // Remove from state
+      setImages((prev) => prev.filter((img) => img.id !== imageId));
+      // Close viewer if viewing the deleted image
+      if (viewingImage?.id === imageId) {
+        setViewingImage(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete image:', err);
+      setError(err instanceof ApiError ? err.message : 'Failed to delete image');
+    }
+  }
+
   if (loadError) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
@@ -164,7 +409,7 @@ export function ChatPage() {
   }
 
   return (
-    <div className="flex min-h-0 w-full flex-1">
+    <div className={`flex min-h-0 w-full flex-1 ${intensityClass}`}>
       {/* LEFT: Chat column */}
       <div className="glow-field flex min-w-0 flex-1 flex-col">
         <div className="w-full shrink-0 border-b border-hairline">
@@ -202,8 +447,8 @@ export function ChatPage() {
                 </div>
               </div>
               <button
+                onClick={() => setShowSettings(true)}
                 className="flex shrink-0 items-center gap-1.5 rounded-full bg-gradient-to-r from-accent to-accent-2 px-3.5 py-2 text-xs font-semibold text-white pill-glow transition hover:brightness-110"
-                title="Coming soon"
               >
                 <Settings size={14} /> <span className="hidden sm:inline">Chat Settings</span>
               </button>
@@ -216,37 +461,57 @@ export function ChatPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl space-y-4 px-4 py-6 md:px-6">
-          {messages.length === 0 && !sending && (
+          {/* Atmospheric Context Panel */}
+          {character && (
+            <AtmospherePanel
+              location={character.currentLocation}
+              sceneDescription={character.currentSceneDescription}
+              timeOfDay={character.timeOfDay}
+              mood={character.currentMood}
+            />
+          )}
+
+          {messages.length === 0 && !sending && !loadingGreeting && (
             <p className="pt-10 text-center text-sm text-faint">
-              Say hi to {character?.name ?? 'your companion'} to get started.
+              Waiting for {character?.name ?? 'your companion'} to say hello...
             </p>
           )}
 
-          {messages.map((m) => (
-            <div key={m.id} className={`flex items-end gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {m.role === 'assistant' && character && <Avatar name={character.name} size="sm" src={character.avatarUrl} />}
-              <div className="max-w-[75%]">
-                <div
-                  className={`rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
-                    m.role === 'user'
-                      ? `bg-gradient-to-br from-accent to-accent-2 text-white ${
-                          m.pending ? 'opacity-60 animate-pulse' : ''
-                        } ${
-                          m.failed ? '!bg-none !bg-danger shadow-lg shadow-danger/30' : 'shadow-md shadow-accent/20'
-                        }`
-                      : 'border border-hairline bg-surface-raised text-ink transition hover:border-hairline-soft hover:bg-surface'
-                  }`}
-                >
-                  {m.content}
+          {messages.map((m) => {
+            // Render narrator messages with special component
+            if (m.role === 'narrator') {
+              return (
+                <NarratorMessage key={m.id} type={m.narratorType || 'scene_transition'} content={m.content} />
+              );
+            }
+
+            // Render normal user/assistant messages
+            return (
+              <div key={m.id} className={`flex items-end gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {m.role === 'assistant' && character && <Avatar name={character.name} size="sm" src={character.avatarUrl} />}
+                <div className="max-w-[75%]">
+                  <div
+                    className={`rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
+                      m.role === 'user'
+                        ? `bg-gradient-to-br from-accent to-accent-2 text-white ${
+                            m.pending ? 'opacity-60 animate-pulse' : ''
+                          } ${
+                            m.failed ? '!bg-none !bg-danger shadow-lg shadow-danger/30' : 'shadow-md shadow-accent/20'
+                          }`
+                        : 'border border-hairline bg-surface-raised text-ink transition hover:border-hairline-soft hover:bg-surface'
+                    }`}
+                  >
+                    {m.content}
+                  </div>
+                  {m.failed && (
+                    <button onClick={() => retry(m)} className="mt-1 text-xs text-danger hover:underline">
+                      Failed to send · Retry
+                    </button>
+                  )}
                 </div>
-                {m.failed && (
-                  <button onClick={() => retry(m)} className="mt-1 text-xs text-danger hover:underline">
-                    Failed to send · Retry
-                  </button>
-                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {sending && (
             <div className="flex items-end gap-2 justify-start">
@@ -273,8 +538,10 @@ export function ChatPage() {
               <button
                 key={label}
                 type="button"
-                title="Coming soon"
-                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition hover:brightness-110 ${className}`}
+                onClick={label === 'Generate Image' ? () => setShowImagePrompt(true) : undefined}
+                disabled={label === 'Generate Image' ? generatingManualImage : true}
+                title={label === 'Generate Image' ? 'Generate a custom image of your companion' : 'Coming soon'}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
               >
                 <Icon size={14} /> {label}
               </button>
@@ -338,10 +605,13 @@ export function ChatPage() {
                 </div>
               </div>
             ) : featuredImage ? (
-              <div className="group relative animate-fade-in-up">
+              <div
+                className="group relative animate-fade-in-up cursor-pointer"
+                onClick={() => setViewingImage(featuredImage)}
+              >
                 <div className="aspect-[3/4] overflow-hidden rounded-xl relative">
                   <img
-                    src={featuredImage.url}
+                    src={getImageUrl(featuredImage.url)}
                     alt={featuredImage.description}
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
@@ -391,23 +661,33 @@ export function ChatPage() {
                   .map((img, idx) => (
                     <div
                       key={idx}
-                      className="group relative cursor-pointer overflow-hidden rounded-lg border border-hairline bg-surface transition-all hover:border-accent/40 hover:shadow-lg hover:shadow-accent/10 animate-fade-in-up"
+                      className="group relative overflow-hidden rounded-lg border border-hairline bg-surface transition-all hover:border-accent/40 hover:shadow-lg hover:shadow-accent/10 animate-fade-in-up"
                       style={{ animationDelay: `${idx * 50}ms` }}
-                      onClick={() => setFeaturedImage(img)}
                     >
-                      <div className="aspect-square overflow-hidden">
+                      <div className="aspect-square overflow-hidden cursor-pointer" onClick={() => setViewingImage(img)}>
                         <img
-                          src={img.url}
+                          src={getImageUrl(img.url)}
                           alt={img.description}
                           className="h-full w-full object-cover transition-all duration-300 group-hover:scale-110"
                           loading="lazy"
                         />
                       </div>
-                      <div className="absolute inset-0 bg-gradient-to-t from-void/80 via-transparent opacity-0 transition group-hover:opacity-100">
+                      <div className="absolute inset-0 bg-gradient-to-t from-void/80 via-transparent opacity-0 transition group-hover:opacity-100 pointer-events-none">
                         <div className="absolute bottom-0 p-3">
                           <p className="text-xs text-ink/90 line-clamp-2">{img.description}</p>
                         </div>
                       </div>
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteImage(img.id);
+                        }}
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-danger p-2 text-white hover:bg-danger/80 shadow-lg"
+                        title="Delete image"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   ))}
               </div>
@@ -416,6 +696,35 @@ export function ChatPage() {
         </div>
       </aside>
       {/* END RIGHT: Image sidebar */}
+
+      {/* Settings Modal */}
+      {showSettings && character && (
+        <ChatSettingsModal character={character} onClose={() => setShowSettings(false)} />
+      )}
+
+      {/* Image Prompt Modal */}
+      {showImagePrompt && character && (
+        <ImagePromptModal
+          characterName={character.name}
+          onGenerate={handleGenerateImage}
+          onClose={() => setShowImagePrompt(false)}
+          isGenerating={generatingManualImage}
+        />
+      )}
+
+      {/* Generating Image Modal */}
+      {generatingManualImage && character && (
+        <GeneratingImageModal characterName={character.name} />
+      )}
+
+      {/* Image Viewer Modal */}
+      {viewingImage && (
+        <ImageViewerModal
+          imageUrl={getImageUrl(viewingImage.url)}
+          description={viewingImage.description}
+          onClose={() => setViewingImage(null)}
+        />
+      )}
     </div>
   );
 }

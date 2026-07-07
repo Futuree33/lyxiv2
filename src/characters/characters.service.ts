@@ -132,7 +132,10 @@ export class CharactersService {
       .set({ cloneCount: sql`${characters.cloneCount} + 1` })
       .where(eq(characters.id, sourceCharacterId));
 
-    // Award XP for creating character
+    // Award Creator XP to the original creator (20 XP per clone)
+    await this.awardCreatorXp(source.user, 20);
+
+    // Award Lyxi XP to the person cloning (for creating a character)
     await this.awardXpForCharacterCreation(userId);
 
     return {
@@ -161,6 +164,48 @@ export class CharactersService {
       .update(characters)
       .set({ isPublic: isPublic ? 1 : 0 })
       .where(eq(characters.id, characterId));
+
+    return { success: true };
+  }
+
+  async deleteCharacter(userId: number, characterId: number) {
+    // Verify ownership
+    await this.getOwnedCharacter(userId, characterId);
+
+    // Delete all related data in a transaction
+    await this.db.transaction(async (tx) => {
+      // Delete chat images
+      await tx.delete(schema.chatImages).where(
+        and(
+          eq(schema.chatImages.user, userId),
+          eq(schema.chatImages.character, characterId)
+        )
+      );
+
+      // Delete chat logs
+      await tx.delete(schema.chatLogs).where(
+        and(
+          eq(schema.chatLogs.user, userId),
+          eq(schema.chatLogs.character, characterId)
+        )
+      );
+
+      // Delete chat summaries
+      await tx.delete(schema.chatSummaries).where(
+        and(
+          eq(schema.chatSummaries.user, userId),
+          eq(schema.chatSummaries.character, characterId)
+        )
+      );
+
+      // Finally, delete the character
+      await tx.delete(characters).where(
+        and(
+          eq(characters.id, characterId),
+          eq(characters.user, userId)
+        )
+      );
+    });
 
     return { success: true };
   }
@@ -216,8 +261,21 @@ export class CharactersService {
     await this.db
       .update(users)
       .set({
+        lyxiXp: sql`${users.lyxiXp} + 50`,
+        lyxiLevel: sql`FLOOR(${users.lyxiXp} / 100) + 1`,
+        // Keep legacy fields
         xp: sql`${users.xp} + 50`,
         charactersCreatedCount: sql`${users.charactersCreatedCount} + 1`,
+      })
+      .where(eq(users.id, userId));
+  }
+
+  private async awardCreatorXp(userId: number, amount: number) {
+    await this.db
+      .update(users)
+      .set({
+        creatorXp: sql`${users.creatorXp} + ${amount}`,
+        creatorLevel: sql`FLOOR(${users.creatorXp} / 200) + 1`,
       })
       .where(eq(users.id, userId));
   }

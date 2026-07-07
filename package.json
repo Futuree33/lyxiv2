@@ -20,6 +20,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:custom": "ts-node -r tsconfig-paths/register scripts/migrate.ts",
+    "db:migrate:latest": "ts-node scripts/apply-latest-migration.ts",
+    "db:clear-images": "ts-node scripts/clear-images.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

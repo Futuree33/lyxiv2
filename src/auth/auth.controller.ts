@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request as ExpressRequest } from 'express';
 import { LoginDto } from './dto/login-dto';
@@ -38,5 +38,42 @@ export class AuthController {
   @Get('stats')
   async getStats(@Request() request: AuthenticatedRequest) {
     return await this.authService.getUserStats(request.user.id);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Update user profile' })
+  @Patch('profile')
+  async updateProfile(
+    @Request() request: AuthenticatedRequest,
+    @Body() body: { username?: string; email?: string },
+  ) {
+    return await this.authService.updateProfile(request.user.id, body);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Change password' })
+  @Post('change-password')
+  async changePassword(
+    @Request() request: AuthenticatedRequest,
+    @Body() body: { currentPassword: string; newPassword: string },
+  ) {
+    return await this.authService.changePassword(
+      request.user.id,
+      body.currentPassword,
+      body.newPassword,
+    );
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Update privacy settings' })
+  @Patch('privacy')
+  async updatePrivacy(
+    @Request() request: AuthenticatedRequest,
+    @Body() body: { isPrivate: boolean },
+  ) {
+    return await this.authService.updatePrivacy(request.user.id, body.isPrivate);
   }
 }

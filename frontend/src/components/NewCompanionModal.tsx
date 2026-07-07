@@ -30,6 +30,30 @@ const PRESET_HOBBIES = ['Gaming', 'Reading', 'Cooking', 'Sports', 'Music', 'Art'
 const PRESET_LIKES = ['Coffee', 'Tea', 'Cats', 'Dogs', 'Nature', 'Technology', 'Fashion', 'Food', 'Sci-Fi', 'Fantasy', 'Romance', 'Mystery'];
 const PRESET_TRAITS = ['Friendly', 'Shy', 'Confident', 'Playful', 'Serious', 'Caring', 'Witty', 'Energetic', 'Calm', 'Curious', 'Loyal', 'Adventurous', 'Mysterious', 'Flirty'];
 
+// Parse persona string to extract traits, hobbies, and likes
+function parsePersona(persona?: string): { traits: string[]; hobbies: string[]; likes: string[] } {
+  if (!persona) return { traits: [], hobbies: [], likes: [] };
+
+  const result = { traits: [] as string[], hobbies: [] as string[], likes: [] as string[] };
+
+  // Match patterns like "Personality: Friendly, Witty. Hobbies: Gaming, Reading. Likes: Coffee, Cats."
+  const personalityMatch = persona.match(/Personality:\s*([^.]+)/i);
+  const hobbiesMatch = persona.match(/Hobbies:\s*([^.]+)/i);
+  const likesMatch = persona.match(/Likes:\s*([^.]+)/i);
+
+  if (personalityMatch) {
+    result.traits = personalityMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+  }
+  if (hobbiesMatch) {
+    result.hobbies = hobbiesMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+  }
+  if (likesMatch) {
+    result.likes = likesMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  return result;
+}
+
 function TagInput({
   label,
   emoji,
@@ -149,6 +173,9 @@ export function NewCompanionModal({
   const navigate = useNavigate();
   const isCloning = Boolean(prefillData);
 
+  // Parse persona to extract tags when cloning
+  const parsedPersona = prefillData ? parsePersona(prefillData.persona) : { traits: [], hobbies: [], likes: [] };
+
   const [step, setStep] = useState<Step>(1);
   const [formData, setFormData] = useState<FormData>({
     name: prefillData?.name || '',
@@ -159,12 +186,12 @@ export function NewCompanionModal({
     hairStyle: prefillData?.hairStyle || '',
     height: prefillData?.height || '',
     build: prefillData?.build || '',
-    ethnicity: '',
-    artStyle: '',
-    age: '',
-    hobbies: [],
-    likes: [],
-    traits: [],
+    ethnicity: prefillData?.ethnicity || '',
+    artStyle: (prefillData?.artStyle as 'realistic' | 'anime' | '') || '',
+    age: prefillData?.age?.toString() || '',
+    hobbies: parsedPersona.hobbies,
+    likes: parsedPersona.likes,
+    traits: parsedPersona.traits,
     backstory: prefillData?.backstory || '',
     avatarUrl: prefillData?.avatarUrl || undefined,
   });
@@ -755,68 +782,74 @@ export function NewCompanionModal({
         </div>
 
         {/* Right side - Live Preview */}
-        {step >= 2 && (
-          <div className="lg:w-80 flex-shrink-0">
-            <div className="sticky top-6 space-y-3 animate-fade-in-up">
-              <div className="rounded-lg border border-hairline bg-surface p-4">
-                <p className="mb-3 text-center text-sm font-semibold text-ink">
-                  {formData.name ? `${formData.name}'s Preview` : 'Live Preview'}
-                </p>
+        <div className="lg:w-80 flex-shrink-0">
+          <div className="sticky top-6 space-y-3 animate-fade-in-up">
+            <div className="rounded-lg border border-hairline bg-surface p-4">
+              <p className="mb-3 text-center text-sm font-semibold text-ink">
+                {formData.name ? `${formData.name}'s Preview` : 'Live Preview'}
+              </p>
 
-                <div className="relative">
-                  {generatingPreview ? (
-                    <div className="flex aspect-square items-center justify-center rounded-lg bg-gradient-to-br from-accent/20 to-accent-2/20 animate-pulse">
-                      <div className="text-center">
-                        <Wand2 size={40} className="mx-auto mb-2 animate-spin text-accent" />
-                        <p className="text-sm font-medium text-accent">Generating...</p>
+              <div className="relative">
+                {step === 1 ? (
+                  <div className="flex aspect-square items-center justify-center rounded-lg border-2 border-dashed border-hairline bg-gradient-to-br from-accent/5 via-accent-2/5 to-accent/5">
+                    <div className="text-center px-4">
+                      <Sparkles size={48} className="mx-auto mb-3 text-accent/40 animate-pulse" />
+                      <p className="text-sm font-medium text-ink mb-1">Preview Coming Soon</p>
+                      <p className="text-xs text-faint">Fill in details to see a live preview</p>
+                    </div>
+                  </div>
+                ) : generatingPreview ? (
+                  <div className="flex aspect-square items-center justify-center rounded-lg bg-gradient-to-br from-accent/20 to-accent-2/20 animate-pulse">
+                    <div className="text-center">
+                      <Wand2 size={40} className="mx-auto mb-2 animate-spin text-accent" />
+                      <p className="text-sm font-medium text-accent">Generating...</p>
+                    </div>
+                  </div>
+                ) : livePreviewUrl ? (
+                  <div className="relative">
+                    <img
+                      src={livePreviewUrl}
+                      alt="Character preview"
+                      className="aspect-square w-full rounded-lg object-cover ring-2 ring-accent/30 shadow-xl shadow-accent/20 transition-all"
+                    />
+                    {previewLocked && (
+                      <div className="absolute top-2 right-2 rounded-full bg-accent px-2 py-1 text-xs font-bold text-white shadow-lg">
+                        🔒 Locked
                       </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex aspect-square items-center justify-center rounded-lg border-2 border-dashed border-hairline bg-surface-raised">
+                    <div className="text-center">
+                      <ImagePlus size={40} className="mx-auto mb-2 text-faint" />
+                      <p className="text-sm text-faint">Preview will appear here</p>
                     </div>
-                  ) : livePreviewUrl ? (
-                    <div className="relative">
-                      <img
-                        src={livePreviewUrl}
-                        alt="Character preview"
-                        className="aspect-square w-full rounded-lg object-cover ring-2 ring-accent/30 shadow-xl shadow-accent/20 transition-all"
-                      />
-                      {previewLocked && (
-                        <div className="absolute top-2 right-2 rounded-full bg-accent px-2 py-1 text-xs font-bold text-white shadow-lg">
-                          🔒 Locked
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex aspect-square items-center justify-center rounded-lg border-2 border-dashed border-hairline bg-surface-raised">
-                      <div className="text-center">
-                        <ImagePlus size={40} className="mx-auto mb-2 text-faint" />
-                        <p className="text-sm text-faint">Preview will appear here</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {livePreviewUrl && !previewLocked && step < 5 && (
-                  <button
-                    type="button"
-                    onClick={() => setPreviewLocked(true)}
-                    className="button-scale mt-3 w-full rounded-lg border-2 border-accent/40 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition-all hover:border-accent hover:bg-accent/20"
-                  >
-                    🔒 Hold this look
-                  </button>
-                )}
-
-                {previewLocked && step < 5 && (
-                  <button
-                    type="button"
-                    onClick={() => setPreviewLocked(false)}
-                    className="button-scale mt-3 w-full rounded-lg border-2 border-hairline bg-surface-raised px-4 py-2 text-sm font-semibold text-muted transition-all hover:border-accent/40 hover:text-ink"
-                  >
-                    🔓 Unlock preview
-                  </button>
+                  </div>
                 )}
               </div>
+
+              {livePreviewUrl && !previewLocked && step < 5 && (
+                <button
+                  type="button"
+                  onClick={() => setPreviewLocked(true)}
+                  className="button-scale mt-3 w-full rounded-lg border-2 border-accent/40 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition-all hover:border-accent hover:bg-accent/20"
+                >
+                  🔒 Hold this look
+                </button>
+              )}
+
+              {previewLocked && step < 5 && (
+                <button
+                  type="button"
+                  onClick={() => setPreviewLocked(false)}
+                  className="button-scale mt-3 w-full rounded-lg border-2 border-hairline bg-surface-raised px-4 py-2 text-sm font-semibold text-muted transition-all hover:border-accent/40 hover:text-ink"
+                >
+                  🔓 Unlock preview
+                </button>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </Modal>
   );

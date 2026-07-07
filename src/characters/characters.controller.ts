@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CharactersService } from './characters.service';
 import { CreateCharacterDto } from './dto/create-character-dto';
@@ -64,5 +64,11 @@ export class CharactersController {
   async generateAvatarTurbo(@Body() body: { name: string; description: string }) {
     const url = await this.charactersService.generateAvatarTurbo(body.name, body.description);
     return { url };
+  }
+
+  @ApiOperation({ summary: 'Delete a character' })
+  @Delete(':id')
+  async delete(@Param('id', ParseIntPipe) id: number, @Request() request: AuthenticatedRequest) {
+    return await this.charactersService.deleteCharacter(request.user.id, id);
   }
 }

@@ -6,7 +6,13 @@ export const users = mysqlTable('users', {
   username: varchar('username', { length: 25 }).notNull().unique(),
   password: varchar('password', { length: 71 }).notNull(),
   isAdmin: boolean('is_admin').notNull().default(false),
-  // User stats and leveling
+  isPrivate: boolean('is_private').notNull().default(false),
+  // Dual leveling system
+  lyxiLevel: int('lyxi_level').notNull().default(1),
+  lyxiXp: int('lyxi_xp').notNull().default(0),
+  creatorLevel: int('creator_level').notNull().default(1),
+  creatorXp: int('creator_xp').notNull().default(0),
+  // Legacy fields (kept for backward compatibility)
   level: int('level').notNull().default(1),
   xp: int('xp').notNull().default(0),
   messagesCount: int('messages_count').notNull().default(0),
@@ -46,6 +52,8 @@ export const characters = mysqlTable('characters', {
   // Context
   backstory: text('backstory'),
   relationshipToUser: varchar('relationship_to_user', { length: 200 }),
+  // Memory system
+  longTermMemory: text('long_term_memory'),
   // Relationship progression
   exp: int('exp').notNull().default(0),
   // Public/Private and Avatar
@@ -53,6 +61,17 @@ export const characters = mysqlTable('characters', {
   avatarUrl: varchar('avatar_url', { length: 500 }),
   clonedFrom: int('cloned_from_character_id').references(() => characters.id),
   cloneCount: int('clone_count').notNull().default(0),
+  // Atmospheric context tracking
+  currentLocation: varchar('current_location', { length: 200 }),
+  currentSceneDescription: text('current_scene_description'),
+  currentMood: varchar('current_mood', { length: 50 }),
+  timeOfDay: varchar('time_of_day', { length: 20 }),
+  // Narrative arc tracking
+  narrativeArc: text('narrative_arc'), // JSON: { arc: string, beat: number, tension: number, lastUpdate: string }
+  storyBeats: text('story_beats'), // Accumulated narrative milestones
+  // Intimacy progression (no gates, just tracking)
+  intimacyLevel: int('intimacy_level').notNull().default(0), // 0-10 scale
+  intimateMemories: text('intimate_memories'), // Special memory bank for intimate moments
   createdAt: datetime('created_at').notNull(),
 });
 
@@ -73,18 +92,71 @@ export const chatSummaries = mysqlTable('chat_summaries', {
   character: int('character_id').notNull().references(() => characters.id),
   summary: text('summary').notNull(),
   lastLog: int('last_log_id').notNull().references(() => chatLogs.id),
+  createdAt: datetime('created_at').notNull(),
   updatedAt: datetime('updated_at').notNull(),
-}, (table) => [
-  uniqueIndex('one_summary_per_conversation').on(table.user, table.character),
-]);
+});
 
 export const chatImages = mysqlTable('chat_images', {
   id: int('id').autoincrement().primaryKey(),
   user: int('user_id').notNull().references(() => users.id),
-  character: int('character_id').notNull().references(() => characters.id),
-  chatLog: int('chat_log_id').notNull().references(() => chatLogs.id),
+  character: int('character_id').references(() => characters.id), // Nullable for camera models
+  chatLog: int('chat_log_id').references(() => chatLogs.id), // Nullable for standalone images
   imageUrl: text('image_url').notNull(),
   sceneDescription: text('scene_description').notNull(),
+  createdAt: datetime('created_at').notNull(),
+});
+
+export const weeklyStats = mysqlTable('weekly_stats', {
+  id: int('id').autoincrement().primaryKey(),
+  user: int('user_id').notNull().references(() => users.id),
+  weekStart: datetime('week_start').notNull(), // Monday 00:00:00 UTC
+  lyxiXpGained: int('lyxi_xp_gained').notNull().default(0),
+  creatorXpGained: int('creator_xp_gained').notNull().default(0),
+  highestLyxiLevel: int('highest_lyxi_level').notNull().default(1),
+  highestCreatorLevel: int('highest_creator_level').notNull().default(1),
+  createdAt: datetime('created_at').notNull(),
+  updatedAt: datetime('updated_at').notNull(),
+});
+
+export const characterWeeklyStats = mysqlTable('character_weekly_stats', {
+  id: int('id').autoincrement().primaryKey(),
+  character: int('character_id').notNull().references(() => characters.id),
+  weekStart: datetime('week_start').notNull(),
+  cloneCount: int('clone_count').notNull().default(0),
+  createdAt: datetime('created_at').notNull(),
+});
+
+export const relationshipLevels = mysqlTable('relationship_levels', {
+  id: int('id').autoincrement().primaryKey(),
+  user: int('user_id').notNull().references(() => users.id),
+  character: int('character_id').notNull().references(() => characters.id),
+  level: int('level').notNull().default(1),
+  exp: int('exp').notNull().default(0),
+  createdAt: datetime('created_at').notNull(),
+  updatedAt: datetime('updated_at').notNull(),
+}, (table) => ({
+  userCharacterIdx: uniqueIndex('user_character_idx').on(table.user, table.character),
+}));
+
+export const sceneHistory = mysqlTable('scene_history', {
+  id: int('id').autoincrement().primaryKey(),
+  user: int('user_id').notNull().references(() => users.id),
+  character: int('character_id').notNull().references(() => characters.id),
+  location: varchar('location', { length: 200 }),
+  sceneDescription: text('scene_description'),
+  mood: varchar('mood', { length: 50 }),
+  timeOfDay: varchar('time_of_day', { length: 20 }),
+  transitionType: varchar('transition_type', { length: 50 }), // 'natural', 'time_skip', 'location_change'
+  createdAt: datetime('created_at').notNull(),
+});
+
+export const narratorMessages = mysqlTable('narrator_messages', {
+  id: int('id').autoincrement().primaryKey(),
+  user: int('user_id').notNull().references(() => users.id),
+  character: int('character_id').notNull().references(() => characters.id),
+  type: varchar('type', { length: 50 }), // 'time_skip', 'scene_transition', 'mood_shift'
+  content: text('content'),
+  insertedAfterMessageId: int('inserted_after_message_id').references(() => chatLogs.id), // Where it appears in chat
   createdAt: datetime('created_at').notNull(),
 });
 

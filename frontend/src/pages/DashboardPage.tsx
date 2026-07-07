@@ -72,7 +72,8 @@ export function DashboardPage() {
     );
   }
 
-  const xpProgress = (stats.stats.xp % 100);
+  const lyxiXpProgress = (stats.stats.lyxiXp % 100);
+  const creatorXpProgress = (stats.stats.creatorXp % 200);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
@@ -84,13 +85,22 @@ export function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Level Card */}
+        {/* Lyxi Level Card */}
         <StatCard
           icon={<Trophy size={24} />}
-          label="Level"
-          value={stats.stats.level}
-          subtitle={`${stats.stats.xp} XP • ${stats.stats.xpToNextLevel} to next level`}
+          label="Lyxi Level"
+          value={stats.stats.lyxiLevel}
+          subtitle={`${stats.stats.lyxiXp} XP • ${stats.stats.lyxiXpToNextLevel} to next`}
           gradient="from-accent to-accent-2"
+        />
+
+        {/* Creator Level Card */}
+        <StatCard
+          icon={<Trophy size={24} />}
+          label="Creator Level"
+          value={stats.stats.creatorLevel}
+          subtitle={`${stats.stats.creatorXp} XP • ${stats.stats.creatorXpToNextLevel} to next`}
+          gradient="from-presence to-accent"
         />
 
         {/* Messages Card */}
@@ -110,31 +120,42 @@ export function DashboardPage() {
           subtitle="Companions created"
           gradient="from-accent to-danger"
         />
-
-        {/* Images Generated (placeholder for now) */}
-        <StatCard
-          icon={<ImageIcon size={24} />}
-          label="Scenes"
-          value={0}
-          subtitle="AI images created"
-          gradient="from-presence to-accent-2"
-        />
       </div>
 
-      {/* XP Progress Bar */}
-      <div className="mt-8 rounded-xl border border-hairline bg-surface p-6">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-medium text-muted">Level {stats.stats.level} Progress</h2>
-            <p className="text-xs text-faint">Keep chatting and creating to level up!</p>
+      {/* Dual Progress Bars */}
+      <div className="mt-8 grid gap-6 md:grid-cols-2">
+        {/* Lyxi Level Progress */}
+        <div className="rounded-xl border border-hairline bg-surface p-6">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-muted">Lyxi Level {stats.stats.lyxiLevel}</h2>
+              <p className="text-xs text-faint">Chat & interact to level up</p>
+            </div>
+            <span className="text-sm font-semibold text-ink">{lyxiXpProgress}/100 XP</span>
           </div>
-          <span className="text-sm font-semibold text-ink">{xpProgress}/100 XP</span>
+          <div className="h-3 overflow-hidden rounded-full bg-surface-raised">
+            <div
+              className="h-full bg-gradient-to-r from-accent to-accent-2 transition-all duration-500"
+              style={{ width: `${lyxiXpProgress}%` }}
+            />
+          </div>
         </div>
-        <div className="h-3 overflow-hidden rounded-full bg-surface-raised">
-          <div
-            className="h-full bg-gradient-to-r from-accent to-accent-2 transition-all duration-500"
-            style={{ width: `${xpProgress}%` }}
-          />
+
+        {/* Creator Level Progress */}
+        <div className="rounded-xl border border-hairline bg-surface p-6">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-muted">Creator Level {stats.stats.creatorLevel}</h2>
+              <p className="text-xs text-faint">Get clones to level up</p>
+            </div>
+            <span className="text-sm font-semibold text-ink">{creatorXpProgress}/200 XP</span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full bg-surface-raised">
+            <div
+              className="h-full bg-gradient-to-r from-presence to-accent transition-all duration-500"
+              style={{ width: `${(creatorXpProgress / 200) * 100}%` }}
+            />
+          </div>
         </div>
       </div>
 

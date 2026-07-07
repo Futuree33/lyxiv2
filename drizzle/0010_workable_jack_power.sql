@@ -1,0 +1,1 @@
+ALTER TABLE `chat_images` MODIFY COLUMN `character_id` int;

@@ -1,0 +1,1 @@
+ALTER TABLE `relationship_levels` ADD CONSTRAINT `user_character_idx` UNIQUE(`user_id`,`character_id`);

@@ -57,6 +57,48 @@
       "when": 1783315770784,
       "tag": "0007_funny_earthquake",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1783377468284,
+      "tag": "0008_fluffy_ser_duncan",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1783383944520,
+      "tag": "0009_acoustic_peter_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1783386539023,
+      "tag": "0010_workable_jack_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1783390230943,
+      "tag": "0011_stale_quasar",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1783393185196,
+      "tag": "0012_lethal_landau",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1783394151592,
+      "tag": "0013_little_yellow_claw",
+      "breakpoints": true
     }
   ]
 }

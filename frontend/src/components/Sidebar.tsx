@@ -18,6 +18,7 @@ import {
   MessageCircle,
   HelpCircle,
   Handshake,
+  Settings,
 } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { NewCompanionModal } from './NewCompanionModal';
@@ -36,11 +37,12 @@ const primaryNav: NavItem[] = [
   { label: 'Home', to: '/', icon: <Home size={18} /> },
   { label: 'Characters', to: '/', icon: <Users size={18} /> },
   { label: 'Dashboard', to: '/dashboard', icon: <LayoutDashboard size={18} />, badge: 'NEW' },
-  { label: 'Leaderboard', icon: <Trophy size={18} />, soon: true },
+  { label: 'Leaderboard', to: '/leaderboard', icon: <Trophy size={18} />, badge: 'NEW' },
+  { label: 'Gallery', to: '/gallery', icon: <Image size={18} />, badge: 'NEW' },
+  { label: 'Camera', to: '/camera', icon: <Camera size={18} />, badge: 'NEW' },
+  { label: 'Settings', to: '/settings', icon: <Settings size={18} /> },
   { label: 'Matchmaker', icon: <Sparkles size={18} />, soon: true },
-  { label: 'Stories', icon: <BookOpen size={18} />, badge: 'NEW', soon: true },
-  { label: 'Camera', icon: <Camera size={18} />, soon: true },
-  { label: 'Gallery', icon: <Image size={18} />, soon: true },
+  { label: 'Stories', icon: <BookOpen size={18} />, soon: true },
   { label: 'Phone', icon: <Smartphone size={18} />, soon: true },
   { label: 'Buy Tokens', icon: <Coins size={18} />, soon: true },
   { label: 'Level Rewards', icon: <Gift size={18} />, soon: true },
@@ -58,7 +60,7 @@ function NavRow({ item, onNavigate, collapsed }: { item: NavItem; onNavigate: ()
       <span className="shrink-0 text-muted group-hover:text-ink">{item.icon}</span>
       {!collapsed && (
         <>
-          <span className="flex-1 truncate text-sm font-medium">{item.label}</span>
+          <span className="flex-1 truncate text-lg font-medium">{item.label}</span>
           {item.badge && (
             <span className="shrink-0 rounded-full bg-gradient-to-r from-accent to-danger px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">
               {item.badge}
@@ -124,7 +126,7 @@ export function Sidebar({
         <Link to="/" onClick={onNavigate} className="flex items-center gap-2 overflow-hidden">
           <Heart size={22} className="shrink-0 fill-accent text-accent" />
           {!collapsed && (
-            <span className="font-display text-xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-accent-soft to-accent">
+            <span className="font-display text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-accent-soft to-accent">
               LYXI.AI
             </span>
           )}
@@ -141,11 +143,11 @@ export function Sidebar({
       <div className="px-4">
         <button
           onClick={() => setShowModal(true)}
-          className={`flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3 py-2 text-sm font-semibold text-white pill-glow transition hover:brightness-110 ${
+          className={`flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3 py-2.5 text-base font-semibold text-white pill-glow transition hover:brightness-110 ${
             collapsed ? 'px-2' : ''
           }`}
         >
-          <span className="text-base leading-none">+</span> {!collapsed && 'New companion'}
+          <span className="text-lg leading-none">+</span> {!collapsed && 'New companion'}
         </button>
       </div>
 
@@ -156,7 +158,7 @@ export function Sidebar({
 
         {!collapsed && (
           <>
-            <p className="px-2 pt-4 pb-2 text-xs font-medium tracking-wide text-faint uppercase">Companions</p>
+            <p className="px-2 pt-4 pb-2 text-sm font-medium tracking-wide text-faint uppercase">Companions</p>
             {error && <p className="px-2 text-xs text-danger">{error}</p>}
             {characters === null && !error && <p className="px-2 text-xs text-faint">Loading…</p>}
             {characters?.length === 0 && (
@@ -175,8 +177,8 @@ export function Sidebar({
               >
                 <Avatar name={c.name} size="sm" src={c.avatarUrl} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-ink">{c.name}</p>
-                  <p className="truncate text-xs text-faint">{c.persona}</p>
+                  <p className="truncate text-base font-medium text-ink">{c.name}</p>
+                  <p className="truncate text-sm text-faint">{c.persona}</p>
                 </div>
               </NavLink>
             ))}
@@ -202,14 +204,14 @@ export function Sidebar({
 
       <div className="border-t border-hairline px-4 py-4">
         {!collapsed && (
-          <div className="mb-3 flex items-center gap-2 text-sm">
+          <div className="mb-3 flex items-center gap-2 text-base">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-presence" aria-hidden="true" />
             <span className="truncate text-muted">{user.username}</span>
           </div>
         )}
         <button
           onClick={onLogout}
-          className="w-full rounded-md border border-hairline px-3 py-1.5 text-sm text-muted transition hover:bg-surface-raised hover:text-ink"
+          className="w-full rounded-md border border-hairline px-3 py-2 text-base text-muted transition hover:bg-surface-raised hover:text-ink"
         >
           {collapsed ? '⏻' : 'Log out'}
         </button>

@@ -10,17 +10,17 @@
   --color-surface-raised: #1c1730;
   --color-hairline: #2b2440;
   --color-hairline-soft: #201a30;
-  --color-ink: #f4f1fa;
-  --color-muted: #9891ac;
-  --color-faint: #6b6480;
+  --color-ink: #ffffff;
+  --color-muted: #b8b0d4;
+  --color-faint: #8a7ea8;
 
-  --color-accent: #e64bc4;
-  --color-accent-soft: #f6b8e8;
-  --color-accent-dim: #7a2f66;
-  --color-accent-2: #8b5cf6;
-  --color-presence: #5eead4;
-  --color-warn: #f59e0b;
-  --color-danger: #f4635f;
+  --color-accent: #ff4dd2;
+  --color-accent-soft: #ffc4f0;
+  --color-accent-dim: #9d3d82;
+  --color-accent-2: #a66eff;
+  --color-presence: #6ffff0;
+  --color-warn: #ffb02e;
+  --color-danger: #ff5757;
 }
 
 .glow-field {
@@ -48,7 +48,7 @@ body {
 }
 
 body {
-  @apply bg-void text-ink font-sans;
+  @apply bg-void text-ink font-sans text-lg;
 }
 
 #root {
@@ -227,4 +227,41 @@ select:focus {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Visual Intensity System - Atmospheric Immersion */
+.intensity-low {
+  --accent-glow: rgba(230, 75, 196, 0.1);
+}
+
+.intensity-medium {
+  --accent-glow: rgba(230, 75, 196, 0.25);
+}
+
+.intensity-medium .rounded-2xl {
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.intensity-high {
+  --accent-glow: rgba(230, 75, 196, 0.4);
+}
+
+.intensity-high .glow-field::before {
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 0%, rgba(230, 75, 196, 0.15) 0%, transparent 70%),
+    radial-gradient(60% 50% at 50% 0%, color-mix(in oklab, var(--color-accent) 30%, transparent) 0%, transparent 70%),
+    radial-gradient(45% 40% at 85% 15%, color-mix(in oklab, var(--color-accent-2) 22%, transparent) 0%, transparent 70%);
+}
+
+.intensity-high .rounded-2xl {
+  box-shadow: 0 6px 20px var(--accent-glow);
+}
+
+.intensity-high .border-hairline {
+  border-color: rgba(230, 75, 196, 0.3);
+}
+
+/* Narrator message fade-in animation */
+.animate-fade-in-up {
+  animation: fade-in-up 0.7s ease-out backwards;
 }
