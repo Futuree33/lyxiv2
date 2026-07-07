@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Copy, Users, Globe, Lock, MessageCircle, Heart, TrendingUp, Star } from 'lucide-react';
+import { Users, Globe, Lock, Heart, TrendingUp, Star } from 'lucide-react';
 import { useCharacters } from '../context/CharactersContext';
 import { Avatar } from '../components/Avatar';
 import { NewCompanionModal } from '../components/NewCompanionModal';

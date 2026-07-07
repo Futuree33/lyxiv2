@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, MessageCircle, Edit3, Heart, Users } from 'lucide-react';
+import { MessageCircle, Edit3, Heart, Users } from 'lucide-react';
 import { Modal } from './Modal';
 import { Avatar } from './Avatar';
 import { api, ApiError, type Character } from '../lib/api';

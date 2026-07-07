@@ -40,7 +40,7 @@ export function AtmospherePanel({ location, sceneDescription, timeOfDay, mood }:
   }
 
   const timeIcon = timeOfDay && TIME_ICONS[timeOfDay as keyof typeof TIME_ICONS];
-  const moodColor = mood && (MOOD_COLORS[mood.toLowerCase() as keyof typeof MOOD_COLORS] || MOOD_COLORS.neutral);
+  const moodColor = mood ? (MOOD_COLORS[mood.toLowerCase() as keyof typeof MOOD_COLORS] || MOOD_COLORS.neutral) : MOOD_COLORS.neutral;
 
   return (
     <div className="sticky top-0 z-10 mb-4 rounded-xl border border-hairline/50 bg-gradient-to-br from-void to-surface/95 p-4 backdrop-blur-md shadow-lg">

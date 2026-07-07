@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { User, Trophy, Award, Heart, Users, Copy, Calendar } from 'lucide-react';
+import { User, Trophy, Award, Users, Calendar } from 'lucide-react';
 import { api, ApiError, type PublicProfile, type Character } from '../lib/api';
 import { Avatar } from '../components/Avatar';
 import { PublicCharacterPreviewModal } from '../components/PublicCharacterPreviewModal';
@@ -12,10 +12,6 @@ function formatDate(iso: string) {
     month: 'long',
     day: 'numeric',
   });
-}
-
-function getRelationshipLevel(exp: number = 0): number {
-  return Math.floor(exp / 10) + 1;
 }
 
 export function ProfilePage() {

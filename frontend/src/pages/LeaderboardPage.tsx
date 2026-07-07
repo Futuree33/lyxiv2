@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trophy, Award, Heart, Users, TrendingUp, Star, Clock } from 'lucide-react';
+import { Trophy, Award, Heart, TrendingUp, Star, Clock } from 'lucide-react';
 import { api } from '../lib/api';
 
 interface PodiumEntry {

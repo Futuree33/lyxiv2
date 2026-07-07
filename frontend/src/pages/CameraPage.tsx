@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Camera as CameraIcon, Download, Sparkles, User, Users } from 'lucide-react';
-import { api, ApiError, getImageUrl, type Character } from '../lib/api';
+import { api, ApiError, getImageUrl } from '../lib/api';
 import { useCharacters } from '../context/CharactersContext';
 
 type Mode = 'character' | 'custom';

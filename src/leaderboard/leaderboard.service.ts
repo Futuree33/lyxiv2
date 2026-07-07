@@ -173,7 +173,7 @@ export class LeaderboardService {
       LIMIT ${limit}
     `);
 
-    return (results[0] as any[]).map((r: any) => ({
+    return (results[0] as unknown as any[]).map((r: any) => ({
       userId: r.userId,
       username: r.username,
       value: r.value,

@@ -228,7 +228,7 @@ export function ChatPage() {
         onGeneratingImage: () => {
           setLoadingImage(true);
         },
-        onImage: async (image) => {
+        onImage: async () => {
           await reloadImages();
           setLoadingImage(false);
         },

@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { User, Lock, Image as ImageIcon, Save, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiError } from '../lib/api';

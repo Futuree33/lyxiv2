@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trophy, MessageCircle, Users, Image as ImageIcon } from 'lucide-react';
+import { Trophy, MessageCircle, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api, type UserStats } from '../lib/api';
 
