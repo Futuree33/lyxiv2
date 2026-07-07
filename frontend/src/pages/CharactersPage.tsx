@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Globe, Lock, Heart, TrendingUp, Star } from 'lucide-react';
+import { Users, Globe, Lock, Heart, TrendingUp, Star, Trash2, Sparkles } from 'lucide-react';
 import { useCharacters } from '../context/CharactersContext';
 import { Avatar } from '../components/Avatar';
 import { NewCompanionModal } from '../components/NewCompanionModal';
@@ -70,6 +70,25 @@ export function CharactersPage() {
     } catch (err) {
       console.error('Failed to toggle visibility:', err);
       alert('Failed to update character visibility');
+    }
+  };
+
+  const handleDelete = async (char: Character, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${char.name}? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.deleteCharacter(char.id);
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to delete character:', err);
+      alert('Failed to delete character');
     }
   };
 
@@ -218,19 +237,39 @@ export function CharactersPage() {
                     })()}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    {/* Publish/Unpublish Button */}
                     <button
                       onClick={(e) => handleToggleVisibility(characters.find((c) => c.id === topCharacterId)!, e)}
-                      className="button-scale rounded-full bg-surface/80 p-3 backdrop-blur-sm transition hover:bg-surface hover:scale-110"
-                      title={characters.find((c) => c.id === topCharacterId)?.isPublic ? 'Make private' : 'Make public'}
+                      className={`button-scale flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition hover:scale-105 ${
+                        characters.find((c) => c.id === topCharacterId)?.isPublic
+                          ? 'bg-presence/20 text-presence hover:bg-presence/30'
+                          : 'bg-gradient-to-r from-accent to-accent-2 text-white shadow-lg hover:shadow-xl'
+                      }`}
                     >
                       {characters.find((c) => c.id === topCharacterId)?.isPublic ? (
-                        <Globe size={18} className="text-presence" />
+                        <>
+                          <Lock size={16} />
+                          <span>Unpublish</span>
+                        </>
                       ) : (
-                        <Lock size={18} className="text-faint" />
+                        <>
+                          <Sparkles size={16} />
+                          <span>Publish</span>
+                        </>
                       )}
                     </button>
-                    <span className="rounded-full bg-gradient-to-r from-accent to-accent-2 px-6 py-3 text-sm font-bold text-white shadow-lg opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:shadow-xl">
+
+                    {/* Delete Button */}
+                    <button
+                      onClick={(e) => handleDelete(characters.find((c) => c.id === topCharacterId)!, e)}
+                      className="button-scale rounded-lg bg-danger/20 px-4 py-2 text-sm font-semibold text-danger transition hover:bg-danger/30 hover:scale-105"
+                      title="Delete character"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+
+                    <span className="hidden rounded-full bg-gradient-to-r from-accent to-accent-2 px-6 py-3 text-sm font-bold text-white shadow-lg opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:shadow-xl sm:block">
                       Continue →
                     </span>
                   </div>
@@ -241,59 +280,115 @@ export function CharactersPage() {
             {/* Other Characters Grid */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {characters.filter((c) => c.id !== topCharacterId).map((c, index) => (
-                <Link
+                <div
                   key={c.id}
-                  to={`/chat/${c.id}`}
-                  className="card-hover group relative flex flex-col gap-3 rounded-xl border border-hairline bg-surface p-4 transition-all hover:border-accent/40 hover:shadow-lg hover:shadow-accent/10"
+                  className="card-hover group relative flex flex-col gap-3 rounded-xl border border-hairline bg-surface p-5 transition-all hover:border-accent/40 hover:shadow-lg hover:shadow-accent/10"
                   style={{ animationDelay: `${(index + 1) * 50}ms` }}
                 >
-                  <div className="flex items-center gap-3">
+                  {/* Header with Avatar and Name */}
+                  <Link to={`/chat/${c.id}`} className="flex items-start gap-3">
                     {c.avatarUrl ? (
                       <img
                         src={c.avatarUrl}
                         alt={c.name}
-                        className="h-12 w-12 rounded-full object-cover ring-2 ring-accent/20 transition-all group-hover:ring-accent/40 group-hover:scale-105"
+                        className="h-16 w-16 rounded-full object-cover ring-2 ring-accent/20 transition-all group-hover:ring-accent/40 group-hover:scale-105"
                       />
                     ) : (
-                      <Avatar name={c.name} />
+                      <div className="h-16 w-16">
+                        <Avatar name={c.name} size="lg" />
+                      </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <h2 className="truncate font-medium text-ink transition-colors group-hover:text-accent">
+                      <h2 className="truncate text-lg font-bold text-ink transition-colors group-hover:text-accent">
                         {c.name}
                       </h2>
-                      <p className="text-xs text-faint">Since {formatDate(c.createdAt)}</p>
+                      {/* Character Details */}
+                      <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted">
+                        {c.age && <span>{c.age}yo</span>}
+                        {c.gender && (
+                          <>
+                            {c.age && <span>•</span>}
+                            <span className="capitalize">{c.gender}</span>
+                          </>
+                        )}
+                        {c.artStyle && (
+                          <>
+                            {(c.age || c.gender) && <span>•</span>}
+                            <span className="capitalize">{c.artStyle}</span>
+                          </>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-faint">Since {formatDate(c.createdAt)}</p>
                     </div>
-                    <button
-                      onClick={(e) => handleToggleVisibility(c, e)}
-                      className="button-scale shrink-0 rounded-full bg-surface-raised p-2 transition hover:bg-hairline hover:scale-110"
-                      title={c.isPublic ? 'Make private' : 'Make public'}
-                    >
-                      {c.isPublic ? (
-                        <Globe size={16} className="text-presence" />
-                      ) : (
-                        <Lock size={16} className="text-faint" />
-                      )}
-                    </button>
-                  </div>
-                  <p className="line-clamp-2 text-sm text-muted">{c.persona}</p>
+                  </Link>
 
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    <div className="flex items-center gap-1 rounded-full bg-surface-raised px-2 py-0.5 text-xs text-muted">
-                      <Heart size={10} className="text-danger" />
-                      <span>Lvl {getRelationshipLevel(c.exp || 0)}</span>
+                  {/* Persona Description */}
+                  <Link to={`/chat/${c.id}`}>
+                    <p className="line-clamp-3 text-sm text-muted leading-relaxed group-hover:text-ink transition-colors">
+                      {c.persona}
+                    </p>
+                  </Link>
+
+                  {/* Stats */}
+                  <div className="flex flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5 rounded-full bg-surface-raised px-3 py-1 text-xs">
+                      <Heart size={12} className="text-danger" />
+                      <span className="font-semibold text-ink">Lvl {getRelationshipLevel(c.exp || 0)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 rounded-full bg-surface-raised px-3 py-1 text-xs text-muted">
+                      <TrendingUp size={12} className="text-accent" />
+                      <span>{c.exp || 0} EXP</span>
                     </div>
                     {c.isPublic && (c.cloneCount || 0) > 0 && (
-                      <div className="flex items-center gap-1 rounded-full bg-surface-raised px-2 py-0.5 text-xs text-presence">
-                        <Users size={10} />
+                      <div className="flex items-center gap-1.5 rounded-full bg-surface-raised px-3 py-1 text-xs text-presence">
+                        <Users size={12} />
                         <span>{c.cloneCount} clones</span>
                       </div>
                     )}
                   </div>
 
-                  <span className="mt-auto text-sm font-medium text-accent opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-1">
-                    Continue chat →
-                  </span>
-                </Link>
+                  {/* Action Buttons */}
+                  <div className="mt-auto flex gap-2 pt-2 border-t border-hairline/50">
+                    <button
+                      onClick={(e) => handleToggleVisibility(c, e)}
+                      className={`button-scale flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition hover:scale-105 ${
+                        c.isPublic
+                          ? 'bg-presence/20 text-presence hover:bg-presence/30'
+                          : 'bg-gradient-to-r from-accent to-accent-2 text-white shadow-md hover:shadow-lg'
+                      }`}
+                    >
+                      {c.isPublic ? (
+                        <>
+                          <Lock size={14} />
+                          <span>Unpublish</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={14} />
+                          <span>Publish</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={(e) => handleDelete(c, e)}
+                      className="button-scale rounded-lg bg-danger/20 px-3 py-2 text-danger transition hover:bg-danger/30 hover:scale-105"
+                      title="Delete character"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+
+                  {/* Continue Chat Hint */}
+                  <Link
+                    to={`/chat/${c.id}`}
+                    className="absolute inset-0 flex items-center justify-center rounded-xl bg-gradient-to-br from-accent/90 to-accent-2/90 opacity-0 transition-all duration-300 group-hover:opacity-100"
+                  >
+                    <span className="font-bold text-white text-lg shadow-lg">
+                      Continue Chat →
+                    </span>
+                  </Link>
+                </div>
               ))}
             </div>
           </div>
