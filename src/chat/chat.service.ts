@@ -18,6 +18,8 @@ import type { Response } from 'express';
 const MODEL = 'deepseek-ai/DeepSeek-V3.2-TEE';
 const CHUTES_BASE_URL = 'https://llm.chutes.ai/v1';
 const FAL_IMAGE_URL = 'https://fal.run/fal-ai/z-image/turbo';
+const VENICE_IMAGE_URL = 'https://api.venice.ai/api/v1/image/generate';
+const VENICE_IMAGE_MODEL = 'seedream-v4';
 // How many of the most recent messages to keep accessible (last 10 messages always available)
 const KEEP_RECENT = 10;
 
@@ -40,6 +42,7 @@ export class ChatService {
   private readonly logger = new Logger(ChatService.name);
   private readonly apiKey = process.env.CHUTES_API_KEY;
   private readonly falKey = process.env.FAL_KEY;
+  private readonly veniceKey = process.env.VENICE_KEY || 'VENICE_INFERENCE_KEY_cOOL1Dr5zjNfz_oJNSoipt9gKn_1DV2cyAxtEolBgI';
 
   constructor(
     @Inject(DRIZZLE) private readonly db: MySql2Database<typeof schema>,
@@ -107,10 +110,19 @@ Story Beat: ${narrativeArc.beat}
 Tension Level: ${narrativeArc.tension}/10
 ` : '';
 
-    const enhancedSystemPrompt = `${basePrompt}
-${scenePrompt}${narrativePrompt}${intimacyGuidelines}
-=== CHARACTER ===
-${character.persona}`;
+    // Include detailed background for first 8 messages
+    const includeBackground = history.length < 8;
+    const backgroundInfo = includeBackground && (character.backstory || character.relationshipToUser) ? `
+=== BACKGROUND (for context in early conversation) ===
+${character.relationshipToUser ? `Relationship: ${character.relationshipToUser}` : ''}
+${character.backstory ? `Background: ${character.backstory}` : ''}
+` : '';
+
+    const enhancedSystemPrompt = `${basePrompt} 
+    === CHARACTER ===
+${character.persona}
+${scenePrompt}${narrativePrompt}${intimacyGuidelines}${backgroundInfo}
+`;
 
     const context: ChatMessage[] = [
       { role: 'system', content: enhancedSystemPrompt },
@@ -221,7 +233,7 @@ ${character.persona}`;
       if (idempotencyKey) {
         const existing = await this.findByIdempotencyKey(idempotencyKey);
         if (existing) {
-          sendEvent('message', { content: existing.content });
+          sendEvent('token', { content: existing.content });
           sendEvent('done', {});
           res.end();
           return;
@@ -274,8 +286,16 @@ Story Beat: ${narrativeArc.beat}
 Tension Level: ${narrativeArc.tension}/10
 ` : '';
 
+      // Include detailed background for first 8 messages
+      const includeBackground = history.length < 8;
+      const backgroundInfo = includeBackground && (character.backstory || character.relationshipToUser) ? `
+=== BACKGROUND (for context in early conversation) ===
+${character.relationshipToUser ? `Relationship: ${character.relationshipToUser}` : ''}
+${character.backstory ? `Background: ${character.backstory}` : ''}
+` : '';
+
       const enhancedSystemPrompt = `${basePrompt}
-${scenePrompt}${narrativePrompt}${intimacyGuidelines}
+${scenePrompt}${narrativePrompt}${intimacyGuidelines}${backgroundInfo}
 === CHARACTER ===
 ${character.persona}`;
 
@@ -296,75 +316,35 @@ ${character.persona}`;
         sendEvent('token', { content: chunk });
       });
 
-      // Determine if image should be generated
-      const generateImage = await this.shouldGenerateImage(userId, characterId);
-      let imageData: { url: string; description: string } | undefined;
-
-      if (generateImage) {
-        try {
-          sendEvent('generating_image', {});
-          const sceneDescription = await this.generateSceneDescription(character, history, fullReply);
-          const imageUrl = await this.generateImage(sceneDescription);
-          imageData = { url: imageUrl, description: sceneDescription };
-          sendEvent('image', imageData);
-        } catch (error) {
-          this.logger.error('Failed to generate image', error);
-        }
-      }
-
-      // Determine if EXP should be awarded
-      const awardExp = await this.shouldAwardExp(userId, characterId);
-      let expGained: number | undefined;
-
-      if (awardExp) {
-        try {
-          const conversationForAnalysis = [
-            ...history.map((log) => ({ role: log.role, content: log.content })),
-            { role: 'user', content: message },
-            { role: 'assistant', content: fullReply },
-          ];
-          const emotionalScore = await this.analyzeEmotionalDepth(conversationForAnalysis);
-          expGained = emotionalScore;
-          await this.awardCharacterExp(characterId, emotionalScore);
-          sendEvent('exp', { amount: expGained });
-        } catch (error) {
-          this.logger.error('Failed to analyze emotional depth', error);
-        }
-      }
-
+      // IMMEDIATELY save message to database after streaming completes
       try {
         const logId = await this.recordTurn(userId, characterId, message, fullReply, idempotencyKey);
         await this.awardXp(userId, 5);
 
-        if (imageData) {
-          await this.recordImage(userId, characterId, logId, imageData.url, imageData.description);
-        }
+        // Send 'done' event immediately so frontend can enable input
+        sendEvent('done', {});
+        res.end();
 
-        // Background atmospheric context analysis (async, non-blocking)
-        this.analyzeAndUpdateContext(
+        // Run ALL slow operations in background (don't await, don't block)
+        this.processBackgroundOperations({
           userId,
           characterId,
           character,
           history,
           message,
           fullReply,
-          logId
-        ).catch((err: Error) => this.logger.error('Background context analysis failed', err));
+          logId,
+        }).catch((err) => this.logger.error('Background operations failed', err));
       } catch (error) {
         if (idempotencyKey && isDuplicateEntryError(error)) {
           const existing = await this.findByIdempotencyKey(idempotencyKey);
           if (existing) {
-            sendEvent('message', { content: existing.content });
+            sendEvent('token', { content: existing.content });
           }
         } else {
           throw error;
         }
       }
-
-      await this.compactIfNeeded(userId, characterId);
-
-      sendEvent('done', {});
-      res.end();
     } catch (error) {
       this.logger.error('Stream error', error);
       sendEvent('error', { message: error instanceof Error ? error.message : 'Unknown error' });
@@ -556,7 +536,8 @@ Write your greeting message now:`;
     this.logger.log(`Generating standalone image for ${character.name}: ${sceneDescription}`);
 
     try {
-      const imageUrl = await this.generateImage(sceneDescription);
+      // Use Venice for manual/button-triggered image generation
+      const imageUrl = await this.generateImageWithVenice(sceneDescription);
 
       // Record the image without a chat log entry (null chatLog for standalone images)
       await this.recordImage(userId, characterId, null, imageUrl, sceneDescription);
@@ -855,6 +836,57 @@ APPEND THIS EXACT STYLE SUFFIX TO THE END: ${styleNote}`;
     return result.images[0].url;
   }
 
+  private async generateImageWithVenice(sceneDescription: string): Promise<string> {
+    this.logger.log(`Calling Venice AI with prompt: ${sceneDescription.substring(0, 100)}...`);
+
+    const response = await fetch(VENICE_IMAGE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.veniceKey}`,
+      },
+      body: JSON.stringify({
+        model: VENICE_IMAGE_MODEL,
+        prompt: sceneDescription,
+        safe_mode: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      this.logger.error(`Venice image generation failed (${response.status})`, detail);
+      throw new Error(`Image generation failed: ${response.status} - ${detail}`);
+    }
+
+    const result = await response.json();
+    this.logger.log(`Venice response received`);
+
+    // Venice returns raw base64 data in images array
+    if (typeof result.images?.[0] === 'string') {
+      const base64Data = result.images[0];
+      return await this.saveRawBase64ToFile(base64Data);
+    }
+
+    throw new Error('Unexpected Venice response format');
+  }
+
+  private async saveRawBase64ToFile(base64Data: string): Promise<string> {
+    // Detect image type from base64 header
+    const imageType = base64Data.startsWith('/9j/') ? 'jpeg' : 'png';
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'images');
+    await fs.mkdir(uploadsDir, { recursive: true });
+
+    const filename = `venice-${Date.now()}-${Math.random().toString(36).slice(2)}.${imageType}`;
+    const filepath = path.join(uploadsDir, filename);
+
+    await fs.writeFile(filepath, buffer);
+    this.logger.log(`Saved Venice image to: ${filepath}`);
+
+    return `/uploads/images/${filename}`;
+  }
+
   private async saveImageToFile(base64DataUrl: string): Promise<string> {
     // Extract base64 data from data URL
     const matches = base64DataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
@@ -907,6 +939,61 @@ APPEND THIS EXACT STYLE SUFFIX TO THE END: ${styleNote}`;
       sceneDescription,
       createdAt: new Date(),
     });
+  }
+
+  private async processBackgroundOperations(options: {
+    userId: number;
+    characterId: number;
+    character: any;
+    history: any[];
+    message: string;
+    fullReply: string;
+    logId: number;
+  }): Promise<void> {
+    const { userId, characterId, character, history, message, fullReply, logId } = options;
+
+    // Run all background operations in parallel (they're independent)
+    await Promise.allSettled([
+      // Image generation
+      (async () => {
+        const shouldGenImage = await this.shouldGenerateImage(userId, characterId);
+        if (shouldGenImage) {
+          try {
+            const sceneDescription = await this.generateSceneDescription(character, history, fullReply);
+            const imageUrl = await this.generateImage(sceneDescription);
+            await this.recordImage(userId, characterId, logId, imageUrl, sceneDescription);
+            this.logger.log(`Background image generated for message ${logId}`);
+          } catch (error) {
+            this.logger.error('Background image generation failed', error);
+          }
+        }
+      })(),
+
+      // EXP analysis
+      (async () => {
+        const shouldAward = await this.shouldAwardExp(userId, characterId);
+        if (shouldAward) {
+          try {
+            const conversationForAnalysis = [
+              ...history.map((log) => ({ role: log.role, content: log.content })),
+              { role: 'user', content: message },
+              { role: 'assistant', content: fullReply },
+            ];
+            const emotionalScore = await this.analyzeEmotionalDepth(conversationForAnalysis);
+            await this.awardCharacterExp(characterId, emotionalScore);
+            this.logger.log(`Background EXP awarded: ${emotionalScore} for message ${logId}`);
+          } catch (error) {
+            this.logger.error('Background EXP analysis failed', error);
+          }
+        }
+      })(),
+
+      // Atmospheric context analysis
+      this.analyzeAndUpdateContext(userId, characterId, character, history, message, fullReply, logId),
+
+      // Compaction
+      this.compactIfNeeded(userId, characterId),
+    ]);
   }
 
   private async compactIfNeeded(userId: number, characterId: number) {

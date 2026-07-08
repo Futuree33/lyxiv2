@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CharactersProvider } from '../context/CharactersContext';
+import { StoriesProvider } from '../context/StoriesContext';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
@@ -33,6 +34,7 @@ export function Layout() {
 
   return (
     <CharactersProvider>
+      <StoriesProvider>
       <div className="flex h-svh bg-void overflow-hidden">
         <div className="fixed inset-x-0 top-0 z-30 flex items-center justify-between border-b border-hairline bg-void/95 px-4 py-3 backdrop-blur md:hidden">
           <button
@@ -73,6 +75,7 @@ export function Layout() {
           </div>
         </main>
       </div>
+      </StoriesProvider>
     </CharactersProvider>
   );
 }

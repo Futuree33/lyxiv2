@@ -265,3 +265,54 @@ select:focus {
 .animate-fade-in-up {
   animation: fade-in-up 0.7s ease-out backwards;
 }
+
+/* Story Reader Styles */
+.story-reader-content {
+  color: var(--color-ink);
+  line-height: 1.8;
+}
+
+.story-reader-content p {
+  margin-bottom: 1.5em;
+}
+
+.story-reader-content p:first-child {
+  margin-top: 0;
+}
+
+.story-reader-content p:last-child {
+  margin-bottom: 0;
+}
+
+
+/* Bookmark highlights */
+.bookmark-highlight {
+  background: linear-gradient(to bottom, transparent 60%, rgba(255, 77, 210, 0.3) 60%);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.bookmark-highlight:hover {
+  background: linear-gradient(to bottom, transparent 60%, rgba(255, 77, 210, 0.5) 60%);
+}
+
+.bookmark-highlight.color-accent {
+  background: linear-gradient(to bottom, transparent 60%, rgba(255, 77, 210, 0.3) 60%);
+}
+
+.bookmark-highlight.color-warn {
+  background: linear-gradient(to bottom, transparent 60%, rgba(255, 176, 46, 0.3) 60%);
+}
+
+.bookmark-highlight.color-presence {
+  background: linear-gradient(to bottom, transparent 60%, rgba(111, 255, 240, 0.3) 60%);
+}
+
+/* Reader focus mode */
+@media (min-width: 768px) {
+  .story-reader-content {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

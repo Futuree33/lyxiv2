@@ -167,6 +167,76 @@ export interface ChatImage {
   createdAt: string;
 }
 
+// Stories interfaces
+export interface Story {
+  id: number;
+  user: number;
+  title: string;
+  description: string;
+  pov: string;
+  genre: string[] | null;
+  plotIdea: string | null;
+  storyPlan: string | null;
+  chapterCount: number;
+  totalWordCount: number;
+  averageReadingTime: number;
+  isPublic: number;
+  clonedFrom: number | null;
+  cloneCount: number;
+  viewCount: number;
+  coverImageUrl: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StoryChapter {
+  id: number;
+  story: number;
+  chapterNumber: number;
+  title: string;
+  content: string;
+  continuationPrompt: string | null;
+  wordCount: number;
+  readingTime: number;
+  temperature: string;
+  createdAt: string;
+}
+
+export interface StoryCharacter {
+  id: number;
+  story: number;
+  character: number;
+  role: string;
+  characterSnapshot: string | null;
+  createdAt: string;
+}
+
+export interface ReadingProgress {
+  id: number;
+  user: number;
+  story: number;
+  lastChapterId: number | null;
+  lastChapterNumber: number;
+  scrollPosition: number;
+  totalReadingTime: number;
+  chaptersCompleted: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StoryBookmark {
+  id: number;
+  user: number;
+  story: number;
+  chapter: number;
+  chapterPosition: number;
+  snippet: string | null;
+  note: string | null;
+  color: string;
+  createdAt: string;
+}
+
 export const api = {
   register: (email: string, username: string, password: string) =>
     request<{ message: string }>('/auth/register', {
@@ -249,7 +319,14 @@ export const api = {
     });
 
     if (!response.ok) {
-      throw new ApiError('Failed to stream message', response.status);
+      const errorBody = await response.json().catch(() => ({}));
+      const errorMessage = errorBody.message || response.statusText;
+
+      if (response.status === 429) {
+        throw new ApiError('Too many messages sent. Please wait a moment and try again.', response.status);
+      }
+
+      throw new ApiError(errorMessage, response.status);
     }
 
     const reader = response.body?.getReader();
@@ -449,4 +526,147 @@ export const api = {
 
   getProfileById: (id: number) =>
     request<PublicProfile>(`/profile/id/${id}`),
+
+  // Stories endpoints
+  createStory: (data: {
+    title: string;
+    description: string;
+    pov: string;
+    genre?: string[];
+    plotIdea?: string;
+    storyPlan?: string;
+    coverImageUrl?: string;
+    characterIds?: number[];
+    characterRoles?: Record<string, string>;
+    firstChapterPrompt: string;
+  }) =>
+    request<Story & { firstChapter: StoryChapter }>('/stories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  listMyStories: () => request<Story[]>('/stories'),
+
+  getStory: (id: number) => request<Story & { characters: StoryCharacter[] }>(`/stories/${id}`),
+
+  updateStory: (id: number, data: {
+    title?: string;
+    description?: string;
+    genre?: string[];
+    plotIdea?: string;
+    storyPlan?: string;
+    coverImageUrl?: string;
+    status?: string;
+  }) =>
+    request<{ success: boolean }>(`/stories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteStory: (id: number) =>
+    request<{ success: boolean }>(`/stories/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // Chapter operations
+  getChapters: (storyId: number) => request<StoryChapter[]>(`/stories/${storyId}/chapters`),
+
+  getChapter: (storyId: number, chapterNumber: number) =>
+    request<StoryChapter>(`/stories/${storyId}/chapters/${chapterNumber}`),
+
+  updateChapter: (storyId: number, chapterNumber: number, data: { title?: string; content?: string }) =>
+    request<{ success: boolean }>(`/stories/${storyId}/chapters/${chapterNumber}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteChapter: (storyId: number, chapterNumber: number) =>
+    request<{ success: boolean }>(`/stories/${storyId}/chapters/${chapterNumber}`, {
+      method: 'DELETE',
+    }),
+
+  // Public operations
+  getPublicStories: (page = 1, limit = 20, genre?: string, sortBy = 'newest') => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(genre ? { genre } : {}),
+      sortBy,
+    });
+    return request<Story[]>(`/stories/public/all?${params}`);
+  },
+
+  getPublicStory: (id: number) => request<Story>(`/stories/public/${id}`),
+
+  cloneStory: (id: number) =>
+    request<{ id: number; success: boolean }>(`/stories/clone/${id}`, {
+      method: 'POST',
+    }),
+
+  toggleStoryVisibility: (id: number, isPublic: boolean) =>
+    request<{ success: boolean }>(`/stories/${id}/visibility`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isPublic }),
+    }),
+
+  // Reading experience
+  getReadingProgress: (storyId: number) => request<ReadingProgress | null>(`/stories/${storyId}/progress`),
+
+  updateReadingProgress: (storyId: number, data: {
+    lastChapterNumber: number;
+    scrollPosition: number;
+    readingTimeSeconds?: number;
+  }) =>
+    request<{ success: boolean }>(`/stories/${storyId}/progress`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  createBookmark: (storyId: number, data: {
+    chapterId: number;
+    chapterPosition: number;
+    snippet?: string;
+    note?: string;
+    color?: string;
+  }) =>
+    request<{ id: number; success: boolean }>(`/stories/${storyId}/bookmarks`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getBookmarks: (storyId: number) => request<StoryBookmark[]>(`/stories/${storyId}/bookmarks`),
+
+  deleteBookmark: (bookmarkId: number) =>
+    request<{ success: boolean }>(`/stories/bookmarks/${bookmarkId}`, {
+      method: 'DELETE',
+    }),
+
+  // Draft operations
+  saveDraft: (draftData: Record<string, any>) =>
+    request<{ success: boolean }>('/stories/drafts', {
+      method: 'POST',
+      body: JSON.stringify({ draftData }),
+    }),
+
+  getDraft: () => request<{ draftData: Record<string, any> } | null>('/stories/drafts'),
+
+  deleteDraft: () =>
+    request<{ success: boolean }>('/stories/drafts', {
+      method: 'DELETE',
+    }),
+
+  // Statistics
+  incrementStoryView: (storyId: number) =>
+    request<{ success: boolean }>(`/stories/${storyId}/view`, {
+      method: 'POST',
+    }),
+
+  getStoryStats: (storyId: number) =>
+    request<{
+      viewCount: number;
+      cloneCount: number;
+      chapterCount: number;
+      totalWordCount: number;
+      averageReadingTime: number;
+    }>(`/stories/${storyId}/stats`),
 };

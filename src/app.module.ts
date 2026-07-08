@@ -9,9 +9,10 @@ import { UploadModule } from './upload/upload.module';
 import { CameraModule } from './camera/camera.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { ProfileModule } from './profile/profile.module';
+import { StoriesModule } from './stories/stories.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, CharactersModule, ChatModule, SettingsModule, AdminModule, UploadModule, CameraModule, LeaderboardModule, ProfileModule],
+  imports: [DatabaseModule, AuthModule, CharactersModule, ChatModule, SettingsModule, AdminModule, UploadModule, CameraModule, LeaderboardModule, ProfileModule, StoriesModule],
 })
 export class AppModule {}
 

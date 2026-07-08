@@ -237,7 +237,7 @@ export function CharactersPage() {
                     })()}
                   </div>
 
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="relative z-10 flex flex-col gap-2 sm:flex-row sm:items-center">
                     {/* Publish/Unpublish Button */}
                     <button
                       onClick={(e) => handleToggleVisibility(characters.find((c) => c.id === topCharacterId)!, e)}
@@ -348,7 +348,7 @@ export function CharactersPage() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="mt-auto flex gap-2 pt-2 border-t border-hairline/50">
+                  <div className="relative z-10 mt-auto flex gap-2 pt-2 border-t border-hairline/50">
                     <button
                       onClick={(e) => handleToggleVisibility(c, e)}
                       className={`button-scale flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition hover:scale-105 ${
@@ -382,7 +382,7 @@ export function CharactersPage() {
                   {/* Continue Chat Hint */}
                   <Link
                     to={`/chat/${c.id}`}
-                    className="absolute inset-0 flex items-center justify-center rounded-xl bg-gradient-to-br from-accent/90 to-accent-2/90 opacity-0 transition-all duration-300 group-hover:opacity-100"
+                    className="absolute inset-0 flex items-center justify-center rounded-xl bg-gradient-to-br from-accent/90 to-accent-2/90 opacity-0 pointer-events-none transition-all duration-300 group-hover:opacity-100 group-hover:pointer-events-auto"
                   >
                     <span className="font-bold text-white text-lg shadow-lg">
                       Continue Chat →

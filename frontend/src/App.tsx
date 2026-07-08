@@ -14,6 +14,11 @@ import { AdminPage } from './pages/AdminPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { StoriesPage } from './pages/StoriesPage';
+import { StoryCreatePage } from './pages/StoryCreatePage';
+import { StoryDetailPage } from './pages/StoryDetailPage';
+import { StoryReaderPage } from './pages/StoryReaderPage';
+import { PublicStoriesPage } from './pages/PublicStoriesPage';
 
 function App() {
   return (
@@ -31,6 +36,11 @@ function App() {
             <Route path="/gallery" element={<GalleryPage />} />
             <Route path="/camera" element={<CameraPage />} />
             <Route path="/chat/:characterId" element={<ChatPage />} />
+            <Route path="/stories" element={<StoriesPage />} />
+            <Route path="/stories/create" element={<StoryCreatePage />} />
+            <Route path="/stories/public" element={<PublicStoriesPage />} />
+            <Route path="/stories/:storyId" element={<StoryDetailPage />} />
+            <Route path="/stories/:storyId/read/:chapterNumber?" element={<StoryReaderPage />} />
             <Route element={<AdminRoute />}>
               <Route path="/admin" element={<AdminPage />} />
             </Route>

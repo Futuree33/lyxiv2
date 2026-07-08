@@ -160,3 +160,110 @@ export const narratorMessages = mysqlTable('narrator_messages', {
   createdAt: datetime('created_at').notNull(),
 });
 
+// Stories feature tables
+export const stories = mysqlTable('stories', {
+  id: int('id').autoincrement().primaryKey(),
+  user: int('user_id').notNull().references(() => users.id),
+  // Story metadata
+  title: varchar('title', { length: 200 }).notNull(),
+  description: text('description').notNull(),
+  pov: varchar('pov', { length: 50 }).notNull(), // 'first_person', 'third_person', 'second_person'
+  genre: varchar('genre', { length: 500 }), // JSON array of tags: ["fantasy", "romance", "adventure"]
+  plotIdea: text('plot_idea'),
+  storyPlan: text('story_plan'),
+  // Story statistics
+  chapterCount: int('chapter_count').notNull().default(0),
+  totalWordCount: int('total_word_count').notNull().default(0),
+  averageReadingTime: int('average_reading_time').notNull().default(0), // minutes
+  // Public sharing
+  isPublic: tinyint('is_public').notNull().default(0),
+  clonedFrom: int('cloned_from_story_id').references(() => stories.id),
+  cloneCount: int('clone_count').notNull().default(0),
+  viewCount: int('view_count').notNull().default(0),
+  // Cover image
+  coverImageUrl: varchar('cover_image_url', { length: 500 }),
+  // Status tracking
+  status: varchar('status', { length: 20 }).notNull().default('draft'), // 'draft', 'in_progress', 'completed', 'abandoned'
+  createdAt: datetime('created_at').notNull(),
+  updatedAt: datetime('updated_at').notNull(),
+});
+
+export const storyChapters = mysqlTable('story_chapters', {
+  id: int('id').autoincrement().primaryKey(),
+  story: int('story_id').notNull().references(() => stories.id),
+  // Chapter metadata
+  chapterNumber: int('chapter_number').notNull(),
+  title: varchar('title', { length: 200 }).notNull(),
+  content: text('content').notNull(),
+  // Generation metadata
+  continuationPrompt: text('continuation_prompt'),
+  wordCount: int('word_count').notNull().default(0),
+  readingTime: int('reading_time').notNull().default(0), // estimated minutes
+  // AI generation settings
+  temperature: varchar('temperature', { length: 10 }).default('0.9'),
+  createdAt: datetime('created_at').notNull(),
+});
+
+export const storyCharacters = mysqlTable('story_characters', {
+  id: int('id').autoincrement().primaryKey(),
+  story: int('story_id').notNull().references(() => stories.id),
+  character: int('character_id').notNull().references(() => characters.id),
+  role: varchar('role', { length: 100 }), // 'protagonist', 'antagonist', 'supporting', 'cameo'
+  characterSnapshot: text('character_snapshot'), // JSON snapshot of character at time of story creation
+  createdAt: datetime('created_at').notNull(),
+}, (table) => ({
+  storyCharacterIdx: uniqueIndex('story_character_idx').on(table.story, table.character),
+}));
+
+export const storyReadingProgress = mysqlTable('story_reading_progress', {
+  id: int('id').autoincrement().primaryKey(),
+  user: int('user_id').notNull().references(() => users.id),
+  story: int('story_id').notNull().references(() => stories.id),
+  // Progress tracking
+  lastChapterId: int('last_chapter_id').references(() => storyChapters.id),
+  lastChapterNumber: int('last_chapter_number').notNull().default(1),
+  scrollPosition: int('scroll_position').notNull().default(0), // percentage 0-100
+  // Reading statistics
+  totalReadingTime: int('total_reading_time').notNull().default(0), // seconds
+  chaptersCompleted: int('chapters_completed').notNull().default(0),
+  createdAt: datetime('created_at').notNull(),
+  updatedAt: datetime('updated_at').notNull(),
+}, (table) => ({
+  userStoryIdx: uniqueIndex('user_story_idx').on(table.user, table.story),
+}));
+
+export const storyBookmarks = mysqlTable('story_bookmarks', {
+  id: int('id').autoincrement().primaryKey(),
+  user: int('user_id').notNull().references(() => users.id),
+  story: int('story_id').notNull().references(() => stories.id),
+  chapter: int('chapter_id').notNull().references(() => storyChapters.id),
+  // Bookmark details
+  chapterPosition: int('chapter_position').notNull(), // character position in chapter text
+  snippet: text('snippet'), // Text snippet around bookmark for context
+  note: text('note'), // User's personal note
+  color: varchar('color', { length: 20 }).default('accent'), // 'accent', 'warn', 'presence'
+  createdAt: datetime('created_at').notNull(),
+});
+
+export const storyWeeklyStats = mysqlTable('story_weekly_stats', {
+  id: int('id').autoincrement().primaryKey(),
+  story: int('story_id').notNull().references(() => stories.id),
+  weekStart: datetime('week_start').notNull(),
+  // Weekly metrics
+  viewCount: int('view_count').notNull().default(0),
+  cloneCount: int('clone_count').notNull().default(0),
+  readCount: int('read_count').notNull().default(0), // unique readers
+  createdAt: datetime('created_at').notNull(),
+});
+
+export const storyDrafts = mysqlTable('story_drafts', {
+  id: int('id').autoincrement().primaryKey(),
+  user: int('user_id').notNull().references(() => users.id),
+  // Draft data (JSON)
+  draftData: text('draft_data').notNull(),
+  createdAt: datetime('created_at').notNull(),
+  updatedAt: datetime('updated_at').notNull(),
+}, (table) => ({
+  userDraftIdx: uniqueIndex('user_draft_idx').on(table.user), // One draft per user
+}));
+

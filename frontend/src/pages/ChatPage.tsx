@@ -180,7 +180,7 @@ export function ChatPage() {
           setSending(false);
         });
     }
-  }, [character, messages.length, id, loadingGreeting, sending]);
+  }, [character, id, loadingGreeting, sending]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -197,7 +197,7 @@ export function ChatPage() {
     setError(null);
     setLoadingImage(false);
 
-    const replyId = `${optimisticId}-reply`;
+    const replyId = `${optimisticId}-reply-${Date.now()}`;
     let firstToken = true;
 
     // Mark user message as sent
@@ -239,20 +239,20 @@ export function ChatPage() {
           setCharacterExp(newExp);
         },
         onDone: async () => {
-          setSending(false);
           setLoadingImage(false);
-          // Refresh character data to get updated atmospheric context
+          // Refresh character data and chat history to get real message IDs
           try {
-            const updatedCharacter = await api.getCharacter(id);
+            const [updatedCharacter, history, narratorMsgs] = await Promise.all([
+              api.getCharacter(id),
+              api.getHistory(id),
+              api.getNarratorMessages(id),
+            ]);
+
             setCharacter(updatedCharacter);
 
-            // Refresh narrator messages to show any new narrator messages
-            const narratorMsgs = await api.getNarratorMessages(id);
-
-            // Re-merge narrator messages with current messages
+            // Use functional update to preserve current messages and merge with fresh data
             setMessages((currentMessages) => {
-              // Filter out old narrator messages and regular messages only
-              const regularMessages = currentMessages.filter(m => m.role !== 'narrator');
+              // Build merged messages from database
               const mergedMessages: DisplayMessage[] = [];
               const narratorByPosition = new Map<number | null, typeof narratorMsgs>();
 
@@ -276,13 +276,12 @@ export function ChatPage() {
                 });
               }
 
-              // Merge with narrator messages
-              for (const msg of regularMessages) {
+              // Merge history with narrator messages
+              for (const msg of history) {
                 mergedMessages.push(msg);
 
                 // Insert narrator messages that come after this message
-                const msgId = typeof msg.id === 'string' ? parseInt(msg.id) : msg.id;
-                const narratorsAfter = narratorByPosition.get(msgId) || [];
+                const narratorsAfter = narratorByPosition.get(msg.id) || [];
                 for (const nm of narratorsAfter) {
                   mergedMessages.push({
                     id: `narrator-${nm.id}`,
@@ -293,14 +292,44 @@ export function ChatPage() {
                 }
               }
 
+              // Preserve any messages in current state that aren't in the database yet
+              // (e.g., streaming messages with temp IDs)
+              const dbMessageIds = new Set(history.map(m => m.id));
+              const dbNarratorIds = new Set(narratorMsgs.map(nm => `narrator-${nm.id}`));
+
+              for (const msg of currentMessages) {
+                const isInDb = msg.role === 'narrator'
+                  ? dbNarratorIds.has(msg.id)
+                  : dbMessageIds.has(msg.id);
+
+                if (!isInDb && !msg.pending && !msg.failed) {
+                  // This message is not in DB yet but not pending/failed - keep it
+                  mergedMessages.push(msg);
+                }
+              }
+
               return mergedMessages;
             });
+
+            // Only clear sending state after messages are updated
+            setSending(false);
           } catch (err) {
-            console.error('Failed to refresh character data:', err);
+            console.error('Failed to refresh chat data:', err);
+            setSending(false);
           }
         },
         onError: (error) => {
-          setError(error);
+          // Parse error for user-friendly messages
+          let userMessage = error;
+          if (error.includes('429') || error.toLowerCase().includes('rate limit')) {
+            userMessage = 'Too many messages sent. Please wait a moment and try again.';
+          } else if (error.toLowerCase().includes('timeout')) {
+            userMessage = 'Request timed out. Please check your connection and try again.';
+          } else if (error.toLowerCase().includes('network') || error.toLowerCase().includes('fetch')) {
+            userMessage = 'Network error. Please check your connection.';
+          }
+
+          setError(userMessage);
           setMessages((prev) =>
             prev.map((m) => (m.id === optimisticId ? { ...m, pending: false, failed: true } : m))
           );
@@ -556,7 +585,8 @@ export function ChatPage() {
                 onKeyDown={onKeyDown}
                 rows={1}
                 placeholder={`Message ${character?.name ?? ''}…`}
-                className="flex-1 w-full resize-none rounded-full border border-hairline bg-surface px-4 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                disabled={sending}
+                className="flex-1 w-full resize-none rounded-full border border-hairline bg-surface px-4 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <button
